@@ -1,0 +1,30 @@
+name: Atualizar dados dos FIIs
+
+on:
+  schedule:
+    - cron: '0 22 * * 1-5'   # 19h de Brasília, de segunda a sexta (depois do fechamento da B3)
+  workflow_dispatch:          # permite rodar na mão pela aba Actions
+
+permissions:
+  contents: write
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Buscar rendimentos e cotas na B3
+        run: node scripts/atualizar-dados.mjs
+
+      - name: Salvar dados-fii.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898900+github-actions[bot]@users.noreply.github.com"
+          git add dados-fii.json
+          git diff --cached --quiet || git commit -m "Atualiza dados dos FIIs"
+          git push
