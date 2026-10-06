@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Relatório de fundos imobiliários com preço-teto, margem de segurança, P/VP e vacância, e calculadora com cotação ao vivo.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2040%2040%22%3E%3Crect%20width%3D%2240%22%20height%3D%2240%22%20rx%3D%2211%22%20fill%3D%22%23e5b547%22%2F%3E%3Cpath%20d%3D%22M10%2029V12l10%2010%2010-10v17%22%20fill%3D%22none%22%20stroke%3D%22%231b1405%22%20stroke-width%3D%223.4%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E">
+<title>Mefius Investimentos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Sora:wght@500;600;700&display=swap">
+<style>
+/* Layout: painel escuro único, relatório em tabela larga no topo, calculadora logo abaixo, glossário curto no fim */
+:root {
+  color-scheme: dark;
+  --bg: #0a0c0f;
+  --panel: #12151a;
+  --panel-hi: #171b21;
+  --field: #0c0e12;
+  --line: #242932;
+  --line-soft: #1a1e25;
+  --fg: #ebe7df;
+  --muted: #8d939e;
+  --faint: #5d6470;
+  --gold: #e5b547;
+  --gold-deep: #b8891f;
+  --gold-ink: #1b1405;
+  --gold-soft: rgba(229, 181, 71, .10);
+  --pos: #3fcf82;
+  --pos-bg: rgba(63, 207, 130, .12);
+  --neg: #f0625e;
+  --neg-bg: rgba(240, 98, 94, .12);
+  --f-display: 'Sora', system-ui, sans-serif;
+  --f-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --f-mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-inline: 16px;
+  padding-block: 0 48px;
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.top, .wrap, .foot { max-width: 1280px; margin-inline: auto; }
+
+/* Cabeçalho */
+.top {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  padding-block: 22px 18px;
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand svg { flex: none; }
+.brand-name { font-family: var(--f-display); font-weight: 700; font-size: 20px; letter-spacing: -.01em; line-height: 1.1; }
+.brand-name span { color: var(--gold); }
+.brand-sub { color: var(--muted); font-size: 12.5px; }
+.stamp {
+  font-family: var(--f-mono); font-size: 12px; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px;
+}
+.stamp b { color: var(--fg); font-weight: 500; }
+
+/* Abas */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 24px; overflow-x: auto; }
+.tab {
+  background: none; border: 0; padding: 12px 16px; font-weight: 500; color: var(--muted);
+  border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; display: flex; align-items: center; gap: 8px;
+}
+.tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--gold); }
+.tab[disabled] { cursor: not-allowed; opacity: .7; }
+.soon { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--gold); background: var(--gold-soft); padding: 2px 7px; border-radius: 999px; }
+
+.wrap { display: grid; gap: 24px; }
+
+/* Painéis */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; min-width: 0; }
+.panel-pad { padding: clamp(18px, 3vw, 28px); }
+.panel h2 { font-family: var(--f-display); font-weight: 600; font-size: 18px; margin: 0 0 6px; text-wrap: balance; }
+.panel .lede { color: var(--muted); margin: 0; font-size: 14px; max-width: 70ch; }
+
+/* Relatório */
+.report-head { padding: clamp(18px, 3vw, 28px); display: grid; gap: 18px; }
+.controls { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: center; }
+.ystep { display: flex; align-items: center; gap: 10px; }
+.ystep label { font-size: 13px; color: var(--muted); }
+.stepper { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--field); overflow: hidden; }
+.stepper button { background: none; border: 0; width: 36px; height: 38px; cursor: pointer; color: var(--gold); font-size: 18px; }
+.stepper button:hover { background: var(--panel-hi); }
+.stepper input {
+  width: 64px; height: 38px; text-align: center; background: none; border: 0; color: var(--fg);
+  font-family: var(--f-mono); font-size: 14px; border-inline: 1px solid var(--line);
+}
+.stepper input:focus { outline: none; background: var(--panel-hi); }
+.summary { font-size: 14px; color: var(--muted); }
+.summary b { color: var(--fg); font-weight: 600; }
+.criteria { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.criteria .lbl { font-size: 12px; color: var(--faint); text-transform: uppercase; letter-spacing: .06em; margin-right: 4px; }
+.chip { font-size: 12.5px; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; color: var(--muted); }
+
+.table-scroll { overflow-x: auto; border-top: 1px solid var(--line); }
+table.report { width: 100%; min-width: 1340px; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.report thead th { background: var(--panel-hi); padding: 0; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.sort {
+  width: 100%; background: none; border: 0; cursor: pointer; padding: 14px 10px;
+  font-family: var(--f-display); font-weight: 600; font-size: 11.5px; line-height: 1.3; color: var(--gold);
+  display: flex; align-items: center; justify-content: center; gap: 6px; text-align: center;
+}
+.sort.left { justify-content: flex-start; padding-left: 20px; text-align: left; }
+.sort .ar { color: var(--gold-deep); font-size: 12px; }
+.sort[aria-sort] .ar { color: var(--gold); }
+.report td { padding: 14px 10px; border-bottom: 1px solid var(--line-soft); text-align: center; font-family: var(--f-mono); font-size: 13.5px; color: #b9c3d3; }
+.report tbody tr:hover td { background: rgba(255,255,255,.015); }
+.report td.tk { text-align: left; padding-left: 20px; font-family: var(--f-body); }
+.tk-btn {
+  background: none; border: 0; padding: 0; cursor: pointer; font-family: var(--f-mono); font-weight: 600; font-size: 14.5px; color: var(--fg);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.tk-btn:hover { color: var(--gold); }
+.tk-btn .go { font-size: 10.5px; font-family: var(--f-body); font-weight: 500; color: var(--gold); border: 1px solid rgba(229,181,71,.35); border-radius: 999px; padding: 1px 7px; }
+.seg { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.report td.desc { text-align: left; font-family: var(--f-body); font-size: 14px; color: var(--fg); font-weight: 500; }
+.src.live { color: var(--pos); }
+.stamp { display: inline-flex; align-items: center; gap: 8px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: none; }
+.stamp.live .dot { background: var(--pos); box-shadow: 0 0 0 3px var(--pos-bg); }
+.stamp.loading .dot { background: var(--gold); }
+
+/* Funds Explorer */
+.explore {
+  border: 1px solid rgba(229,181,71,.5); border-radius: 16px; padding: clamp(20px, 3vw, 30px);
+  background: linear-gradient(135deg, rgba(229,181,71,.12), rgba(229,181,71,.03) 60%), var(--panel);
+  display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px 32px; align-items: center;
+}
+.explore h2 { font-family: var(--f-display); font-weight: 700; font-size: 22px; margin: 0 0 8px; text-wrap: balance; }
+.explore p { margin: 0; color: #b9c3d3; font-size: 14.5px; max-width: 60ch; }
+.explore-act { display: grid; gap: 12px; }
+.explore-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.explore-row .field { flex: 1 1 140px; }
+.btn-link {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; text-align: center;
+  border-radius: 12px; padding: 0 22px; height: 48px; font-weight: 600; font-size: 15px; flex: 1 1 220px; align-self: end;
+  color: var(--gold-ink); background: linear-gradient(180deg, #f0c862, var(--gold) 55%, #d4a232);
+  box-shadow: 0 8px 28px rgba(229,181,71,.28), inset 0 1px 0 rgba(255,255,255,.35);
+}
+.btn-link:hover { filter: brightness(1.05); }
+.link-sub { color: var(--gold); font-size: 13.5px; text-decoration: none; justify-self: start; }
+.link-sub:hover { text-decoration: underline; }
+@media (max-width: 760px) { .explore { grid-template-columns: 1fr; } }
+.report td.strong { color: var(--fg); font-weight: 500; }
+.report td.hi { color: var(--fg); font-weight: 600; }
+.src { display: block; font-size: 10px; color: var(--faint); font-family: var(--f-body); margin-top: 2px; }
+.pos { color: var(--pos) !important; }
+.neg { color: var(--neg) !important; }
+.mid { color: var(--gold) !important; }
+.pill { display: inline-block; font-family: var(--f-display); font-weight: 700; font-size: 11px; letter-spacing: .04em; padding: 5px 12px; border-radius: 999px; }
+.pill.yes { background: var(--pos-bg); color: var(--pos); }
+.pill.no { background: var(--neg-bg); color: var(--neg); }
+.report-note { padding: 16px 20px 20px; color: var(--muted); font-size: 13px; display: grid; gap: 4px; }
+.report-note b { color: var(--fg); font-weight: 500; }
+
+/* Calculadora */
+.calc { display: grid; gap: 22px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 18px; }
+.field { display: grid; gap: 7px; align-content: start; min-width: 0; }
+.field label { font-size: 13px; color: #b9c3d3; }
+.field input {
+  height: 48px; width: 100%; background: var(--field); border: 1px solid var(--line); border-radius: 10px;
+  padding: 0 14px; color: var(--fg); font-size: 15px; font-family: var(--f-body);
+}
+.field input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
+.field input[aria-invalid="true"] { border-color: var(--neg); }
+.hint { font-size: 11.5px; color: var(--faint); line-height: 1.4; }
+.hint.live { color: var(--pos); }
+.hint.warn, .hint.loading { color: var(--gold); }
+#cTicker { text-transform: uppercase; }
+.actions { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.btn-primary {
+  border: 0; cursor: pointer; border-radius: 12px; padding: 16px 24px; font-weight: 600; font-size: 15px;
+  color: var(--gold-ink); background: linear-gradient(180deg, #f0c862, var(--gold) 55%, #d4a232);
+  box-shadow: 0 8px 28px rgba(229,181,71,.28), inset 0 1px 0 rgba(255,255,255,.35);
+}
+.btn-primary:hover { filter: brightness(1.05); }
+.err { color: var(--neg); font-size: 13.5px; }
+
+.results { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.card { border: 1px solid var(--line); border-radius: 14px; padding: 18px; background: var(--panel-hi); min-width: 0; }
+.card.main { border-color: rgba(229,181,71,.45); background: linear-gradient(180deg, rgba(229,181,71,.07), rgba(229,181,71,.02)); }
+.card .k { font-family: var(--f-display); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #b9c3d3; }
+.card .v { font-family: var(--f-mono); font-size: 22px; font-weight: 600; margin-top: 8px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.card.main .v { color: var(--gold); }
+
+.gauge { border: 1px solid var(--line); border-radius: 14px; padding: 18px 18px 20px; background: var(--panel-hi); display: grid; gap: 14px; }
+.gauge-ends { display: flex; justify-content: space-between; gap: 12px; font-family: var(--f-display); font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: #b9c3d3; }
+.track { position: relative; height: 8px; border-radius: 999px; background: linear-gradient(90deg, var(--neg), var(--gold) 50%, var(--pos)); }
+.mark {
+  position: absolute; top: 50%; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 4px solid #0b0d10;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.4); transform: translate(-50%, -50%); left: 50%; transition: left .35s ease;
+}
+.verdict { justify-self: start; font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 999px; border: 1px solid; }
+.verdict.yes { color: var(--pos); background: var(--pos-bg); border-color: rgba(63,207,130,.35); }
+.verdict.no { color: var(--neg); background: var(--neg-bg); border-color: rgba(240,98,94,.35); }
+
+.sens h3 { font-family: var(--f-display); font-size: 14px; font-weight: 600; margin: 0 0 4px; }
+.sens p { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+.sens-scroll { overflow-x: auto; }
+table.mini { width: 100%; min-width: 460px; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.mini th { text-align: left; font-family: var(--f-display); font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--gold); padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.mini td { padding: 10px 12px; font-family: var(--f-mono); font-size: 13.5px; border-bottom: 1px solid var(--line-soft); color: #b9c3d3; }
+.mini tr.cur td { background: var(--gold-soft); color: var(--fg); }
+
+/* Glossário */
+.gloss { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.term { border-top: 1px solid var(--line); padding-top: 14px; min-width: 0; }
+.term h3 { margin: 0 0 6px; font-family: var(--f-display); font-size: 14.5px; font-weight: 600; color: var(--gold); }
+.term p { margin: 0; color: #b9c3d3; font-size: 13.5px; }
+.term code { font-family: var(--f-mono); font-size: 12.5px; color: var(--fg); background: var(--field); border: 1px solid var(--line); padding: 1px 6px; border-radius: 6px; }
+
+.foot { margin-top: 28px; color: var(--faint); font-size: 12.5px; display: grid; gap: 6px; }
+.foot b { color: var(--muted); font-weight: 500; }
+
+@media (max-width: 900px) {
+  .results { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gloss { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .grid3 { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .results, .gloss { grid-template-columns: 1fr; }
+  .card .v { font-size: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mark { transition: none; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
+      <defs>
+        <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#f3cd6c"/>
+          <stop offset="1" stop-color="#b8891f"/>
+        </linearGradient>
+      </defs>
+      <rect width="40" height="40" rx="11" fill="url(#lg)"/>
+      <path d="M10 29V12l10 10 10-10v17" fill="none" stroke="#1b1405" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="30" cy="12" r="2.6" fill="#1b1405"/>
+    </svg>
+    <div>
+      <div class="brand-name">Mefius <span>Investimentos</span></div>
+      <div class="brand-sub">Preço-teto e margem de segurança</div>
+    </div>
+  </div>
+  <div class="stamp" id="stamp" aria-live="polite"><span class="dot"></span><span id="stampText">Cotações de <b>05/10/2026</b></span></div>
+</header>
+
+<main class="wrap">
+  <nav class="tabs" role="tablist" aria-label="Classes de ativos">
+    <button class="tab" role="tab" aria-selected="true" id="tab-fii">Fundos imobiliários</button>
+    <button class="tab" role="tab" aria-selected="false" disabled>Ações <span class="soon">em breve</span></button>
+  </nav>
+
+  <!-- Relatório -->
+  <section class="panel" id="relatorio" aria-labelledby="rel-title">
+    <div class="report-head">
+      <div>
+        <h2 id="rel-title">Fundos acompanhados: preço-teto e margem de segurança</h2>
+        <p class="lede">Fundos de tijolo com vacância baixa, P/VP perto de 1 e bons rendimentos. O rendimento projetado repete os últimos 12 meses, e o payout é 100% porque fundos imobiliários distribuem quase todo o resultado. Clique em um ticker para simular.</p>
+      </div>
+      <div class="controls">
+        <div class="ystep">
+          <label for="yieldGlobal">Yield aceitável para todos</label>
+          <div class="stepper">
+            <button type="button" id="yMinus" aria-label="Diminuir yield">−</button>
+            <input id="yieldGlobal" inputmode="decimal" value="10%" aria-describedby="sumText">
+            <button type="button" id="yPlus" aria-label="Aumentar yield">+</button>
+          </div>
+        </div>
+        <div class="summary" id="sumText" aria-live="polite"></div>
+      </div>
+      <div class="criteria">
+        <span class="lbl">Critérios</span>
+        <span class="chip">Fundo de tijolo</span>
+        <span class="chip">Vacância até 6%</span>
+        <span class="chip">P/VP entre 0,80 e 1,00</span>
+        <span class="chip">Liquidez acima de R$ 3 mi/dia</span>
+        <span class="chip">Yield 12m acima de 8%</span>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table class="report" id="reportTable">
+        <thead>
+          <tr>
+            <th scope="col"><button class="sort left" data-k="t">Ticker <span class="ar">↕</span></button></th>
+            <th scope="col"><button class="sort left" data-k="nome">Descrição <span class="ar">↕</span></button></th>
+            <th scope="col"><button class="sort" data-k="preco">Cotação<br>atual <span class="ar">↕</span></button></th>
+            <th scope="col"><button class="sort" data-k="lucro">Rendimento<br>projetado (12m) <span class="ar">↕</span></button></th>
+            <th scope="col"><button class="sort" data-k="cotas">Quantidade<br>de cotas <span class="ar">↕</span></button></th>
+            <th scope="col"><button class="sort" data-k="payout">Payout<br>(%) <span class="ar">↕</span></button></th>
+            <th scope="col"><button class="sort" data-k="y">Yield<br>aceitável <span class="ar">↕</span></button></th>
+            <th scope="col"><button class="sort" data-k="rend12">Rendimento<br>por cota <span class="ar">↕</span></button></th>
+            <th scope="col"><button class="sort" data-k="teto">Preço-<br>teto <span class="ar">↕</span></button></th>
+            <th scope="col"><button class="sort" data-k="margem">Margem <span class="ar">↕</span></button></th>
+            <th scope="col"><button class="sort" data-k="pvp">P/VP <span class="ar">↕</span></button></th>
+            <th scope="col"><button class="sort" data-k="vac">Vacância <span class="ar">↕</span></button></th>
+            <th scope="col"><button class="sort" data-k="margem">Comprar? <span class="ar">↕</span></button></th>
+          </tr>
+        </thead>
+        <tbody id="reportBody"></tbody>
+      </table>
+    </div>
+    <div class="report-note">
+      <span><b>Ficaram de fora:</b> PVBI11 (vacância de 17,8%) e TRXF11 (yield de 16,7% muito acima dos pares; vale conferir o motivo antes de usar o número).</span>
+      <span>Rendimento por cota é a soma dos últimos 12 meses. Se o fundo cortar ou aumentar o rendimento, o preço-teto muda junto.</span>
+    </div>
+  </section>
+
+  <!-- Calculadora -->
+  <section class="panel panel-pad" id="calculadora" aria-labelledby="calc-title">
+    <form class="calc" id="calcForm" novalidate>
+      <div>
+        <h2 id="calc-title">Simular um fundo</h2>
+        <p class="lede">Teste preço-teto e margem de segurança sem alterar os fundos acompanhados no relatório.</p>
+      </div>
+
+      <div class="grid3">
+        <div class="field">
+          <label for="cTicker">Ticker</label>
+          <input id="cTicker" autocomplete="off" value="XPML11" maxlength="8" spellcheck="false">
+          <span class="hint" id="tickerHint" aria-live="polite">Digite o ticker de um fundo, por exemplo XPML11.</span>
+        </div>
+        <div class="field">
+          <label for="cPreco">Preço atual (R$)</label>
+          <input id="cPreco" inputmode="decimal" autocomplete="off">
+          <span class="hint" id="precoHint">Cotação consultada em 05/10/2026. Pode haver defasagem; ajuste para o preço da sua corretora.</span>
+        </div>
+        <div class="field">
+          <label for="cLucro">Lucro projetado (R$)</label>
+          <input id="cLucro" inputmode="decimal" autocomplete="off">
+          <span class="hint">Para FII: rendimento por cota em 12 meses × quantidade de cotas.</span>
+        </div>
+        <div class="field">
+          <label for="cQtd">Quantidade (cotas)</label>
+          <input id="cQtd" inputmode="numeric" autocomplete="off">
+          <span class="hint">Número de cotas emitidas pelo fundo.</span>
+        </div>
+        <div class="field">
+          <label for="cPayout">Payout (%)</label>
+          <input id="cPayout" inputmode="decimal" autocomplete="off">
+          <span class="hint">Fundos imobiliários distribuem pelo menos 95% do resultado. Use 100% se o lucro já for o valor distribuído.</span>
+        </div>
+        <div class="field">
+          <label for="cYield">Yield aceitável (%)</label>
+          <input id="cYield" inputmode="decimal" autocomplete="off">
+          <span class="hint">Retorno mínimo que você exige por ano.</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="btn-primary">Calcular preço-teto</button>
+        <span class="err" id="cErr" role="alert"></span>
+      </div>
+
+      <div class="results" aria-live="polite">
+        <div class="card main"><div class="k">Preço-teto</div><div class="v" id="rTeto">–</div></div>
+        <div class="card"><div class="k">Lucro por cota</div><div class="v" id="rLpa">–</div></div>
+        <div class="card"><div class="k">Dividendo por cota</div><div class="v" id="rDpa">–</div></div>
+        <div class="card"><div class="k">Margem de segurança</div><div class="v" id="rMargem">–</div></div>
+      </div>
+
+      <div class="gauge">
+        <div class="gauge-ends"><span>Preço acima do teto</span><span>Preço abaixo do teto</span></div>
+        <div class="track"><div class="mark" id="gMark"></div></div>
+        <div class="verdict yes" id="vMsg">–</div>
+      </div>
+
+      <div class="sens">
+        <h3>Preço-teto para cada yield exigido</h3>
+        <p id="sensLede">Quanto mais retorno você exige, mais baixo fica o preço máximo a pagar.</p>
+        <div class="sens-scroll">
+          <table class="mini">
+            <thead><tr><th>Yield exigido</th><th>Preço-teto</th><th>Margem</th><th>Comprar?</th></tr></thead>
+            <tbody id="sensBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <!-- Glossário -->
+  <section class="panel panel-pad" aria-labelledby="gl-title">
+    <h2 id="gl-title">Como ler os números</h2>
+    <p class="lede">O cálculo é o mesmo para todos os fundos. Estes são os termos usados no relatório e na calculadora.</p>
+    <div class="gloss">
+      <div class="term"><h3>Payout</h3><p>Parte do lucro que vira rendimento para o cotista. Fundos imobiliários são obrigados a distribuir pelo menos 95% do resultado em caixa a cada semestre.</p></div>
+      <div class="term"><h3>Yield aceitável</h3><p>O retorno mínimo por ano que você exige. Compare com a renda fixa: 10% isento equivale a cerca de 11,8% bruto em um CDB com 15% de IR.</p></div>
+      <div class="term"><h3>Preço-teto</h3><p>O preço máximo para receber o yield que você exige. <code>rendimento anual ÷ yield</code></p></div>
+      <div class="term"><h3>Margem de segurança</h3><p>Quanto o preço-teto está acima da cotação. Margem positiva dá folga se o rendimento cair. <code>teto ÷ cotação − 1</code></p></div>
+      <div class="term"><h3>P/VP</h3><p>Cotação dividida pelo valor patrimonial por cota. Abaixo de 1, você paga menos do que os imóveis valem nos laudos de avaliação.</p></div>
+      <div class="term"><h3>Vacância</h3><p>Parte da área sem inquilino. Imóvel vazio não paga aluguel e ainda gera custo. Acompanhe a tendência no relatório gerencial do fundo.</p></div>
+    </div>
+  </section>
+
+  <!-- Consulta externa -->
+  <section class="explore" aria-labelledby="ex-title">
+    <div>
+      <h2 id="ex-title">Quer analisar um fundo a fundo?</h2>
+      <p>No Funds Explorer você encontra histórico de rendimentos, relatórios gerenciais, lista de imóveis, vacância mês a mês e comparação com outros fundos do mesmo segmento.</p>
+    </div>
+    <div class="explore-act">
+      <div class="explore-row">
+        <div class="field">
+          <label for="exTicker">Ticker do fundo</label>
+          <input id="exTicker" autocomplete="off" value="XPML11" maxlength="8">
+        </div>
+        <a class="btn-link" id="exGo" href="https://www.fundsexplorer.com.br/funds/xpml11" target="_blank" rel="noopener noreferrer">Consultar no Funds Explorer ↗</a>
+      </div>
+      <a class="link-sub" href="https://www.fundsexplorer.com.br/ranking" target="_blank" rel="noopener noreferrer">Ver o ranking completo de fundos imobiliários ↗</a>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span id="srcNote"><b>Fonte:</b> cotação, rendimentos, cotas emitidas, valor patrimonial e vacância consultados no Investidor10 em 05/10/2026. As cotações mudam ao longo do dia.</span>
+  <span>Mefius Investimentos aplica um método de cálculo de preço-teto. Não é recomendação de compra ou venda.</span>
+</footer>
+
+<script>
+// Dados-base consultados no Investidor10 em 05/10/2026 (usados quando não há cotação ao vivo)
+const FIIS = [
+  { t: 'XPML11', nome: 'XP Malls',                   seg: 'Shoppings',    preco: 102.67, rend12: 11.04, ult: 0.92, cotas: 64308044,  vp: 110.11, vac: 4.9 },
+  { t: 'HSML11', nome: 'HSI Malls',                  seg: 'Shoppings',    preco: 84.85,  rend12: 8.66,  ult: 0.75, cotas: 21329965,  vp: 98.93,  vac: 3.8 },
+  { t: 'VISC11', nome: 'Vinci Shopping Centers',     seg: 'Shoppings',    preco: 106.53, rend12: 9.99,  ult: 0.84, cotas: 28828629,  vp: 115.45, vac: 6.0 },
+  { t: 'HGLG11', nome: 'Pátria Log',                 seg: 'Logística',    preco: 150.36, rend12: 13.41, ult: 1.17, cotas: 45582800,  vp: 166.09, vac: 2.9 },
+  { t: 'BTLG11', nome: 'BTG Pactual Logística',      seg: 'Logística',    preco: 101.00, rend12: 9.62,  ult: 0.81, cotas: 70940250,  vp: 106.69, vac: 1.2 },
+  { t: 'BRCO11', nome: 'Bresco Logística',           seg: 'Logística',    preco: 111.22, rend12: 11.00, ult: 0.91, cotas: 18021292,  vp: 114.76, vac: 1.6 },
+  { t: 'LVBI11', nome: 'VBI Logístico',              seg: 'Logística',    preco: 98.00,  rend12: 9.10,  ult: 0.80, cotas: 16118554,  vp: 120.99, vac: 0.4 },
+  { t: 'KNRI11', nome: 'Kinea Renda Imobiliária',    seg: 'Híbrido',      preco: 159.63, rend12: 13.21, ult: 1.10, cotas: 28204036,  vp: 163.56, vac: 3.91 },
+  { t: 'HGRU11', nome: 'Pátria Renda Urbana',        seg: 'Renda urbana', preco: 117.90, rend12: 11.90, ult: 0.95, cotas: 24834193,  vp: 128.11, vac: 0.8 },
+  { t: 'ALZR11', nome: 'Alianza Trust Renda Imobiliária', seg: 'Híbrido', preco: 10.21,  rend12: 1.01,  ult: 0.08, cotas: 164400490, vp: 10.69,  vac: 3.0 },
+];
+const BASE_DATE = '05/10/2026';
+
+// Cotações ao vivo: cole aqui o token gratuito da brapi.dev.
+// Só funciona com o site hospedado fora do Claude (GitHub Pages, Netlify etc.).
+// Sem token, a página usa as cotações de 05/10/2026.
+const BRAPI_TOKEN = 'fuPNAcBFvfKWJLMNfHEet5';
+const CACHE_KEY = 'mefius-cotacoes-v3';
+const CACHE_MS = 5 * 60 * 1000; // uso pessoal: consultas de sobra no plano gratuito
+// Rendimentos e cotas de todos os FIIs, gerado todo dia pelo GitHub Actions (scripts/atualizar-dados.mjs)
+const DADOS_URL = 'dados-fii.json';
+let liveAt = null; // horário da cotação ao vivo mais recente
+let b3 = null;     // { atualizadoEm, fundos: { TICKER: { nome, cotas, rend12, pagamentos, ultimo } } }
+
+const fBRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const fInt = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 });
+const fDec = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fPct = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 });
+const brl = n => fBRL.format(n).replace(/ /g, ' ');
+const pct = n => fPct.format(n) + '%';
+const pctM = n => fDec.format(n * 100) + '%';
+const hora = ts => new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+// Aceita "R$ 1.234,56", "1234.56", "64.308.044", "10%"
+function parseBR(s) {
+  s = String(s ?? '').trim().replace(/[^\d,.\-]/g, '');
+  if (!s) return NaN;
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  else if (/^\d+\.\d{1,2}$/.test(s)) { /* decimal com ponto */ }
+  else s = s.replace(/\./g, '');
+  return parseFloat(s);
+}
+
+const $ = id => document.getElementById(id);
+let globalYield = 10;
+let sortState = { k: 'margem', dir: -1 };
+
+// ---------- Relatório ----------
+function rowData(f, y) {
+  const lucro = f.rend12 * f.cotas;
+  const teto = f.rend12 / (y / 100);
+  const margem = teto / f.preco - 1;
+  return { ...f, lucro, payout: 100, y, teto, margem, pvp: f.preco / f.vp };
+}
+
+function renderTable() {
+  const rows = FIIS.map(f => rowData(f, globalYield));
+  const { k, dir } = sortState;
+  rows.sort((a, b) => (typeof a[k] === 'string' ? a[k].localeCompare(b[k]) : a[k] - b[k]) * dir);
+
+  $('reportBody').innerHTML = rows.map(r => {
+    const sim = r.margem >= 0;
+    const pvCls = r.pvp <= 1 ? 'pos' : r.pvp <= 1.1 ? 'mid' : 'neg';
+    const vacCls = r.vac <= 5 ? 'pos' : r.vac <= 10 ? 'mid' : 'neg';
+    return `<tr>
+      <td class="tk"><button type="button" class="tk-btn" data-t="${r.t}" aria-label="Simular ${r.t}">${r.t}<span class="go">simular</span></button></td>
+      <td class="desc">${r.nome}<span class="seg">${r.seg}</span></td>
+      <td>${brl(r.preco)}<span class="src ${r.live ? 'live' : ''}">${r.live ? 'ao vivo' : BASE_DATE}</span></td>
+      <td class="strong">${brl(r.lucro)}</td>
+      <td>${fInt.format(r.cotas)}<span class="src">${r.b3 ? 'B3' : 'Investidor10'}</span></td>
+      <td class="hi">100%</td>
+      <td class="hi">${pct(r.y)}</td>
+      <td>${brl(r.rend12)}<span class="src">${r.b3 ? 'B3 · 12 meses' : '12 meses'}</span></td>
+      <td>${brl(r.teto)}</td>
+      <td class="${sim ? 'pos' : 'neg'}">${pctM(r.margem)}</td>
+      <td class="${pvCls}">${fDec.format(r.pvp)}</td>
+      <td class="${vacCls}">${fPct.format(r.vac)}%</td>
+      <td><span class="pill ${sim ? 'yes' : 'no'}">${sim ? 'SIM' : 'NÃO'}</span></td>
+    </tr>`;
+  }).join('');
+
+  const nSim = rows.filter(r => r.margem >= 0).length;
+  $('sumText').innerHTML = `<b>${nSim} de ${rows.length}</b> fundos estão abaixo do preço-teto com yield de <b>${pct(globalYield)}</b>.`;
+
+  document.querySelectorAll('.sort').forEach(b => {
+    const active = b.dataset.k === k && !b.textContent.trim().startsWith('Comprar');
+    b.querySelector('.ar').textContent = active ? (dir > 0 ? '↑' : '↓') : '↕';
+    if (active) b.setAttribute('aria-sort', dir > 0 ? 'ascending' : 'descending'); else b.removeAttribute('aria-sort');
+  });
+}
+
+function setGlobalYield(v) {
+  if (!isFinite(v)) v = globalYield;
+  globalYield = Math.min(25, Math.max(1, Math.round(v * 100) / 100));
+  $('yieldGlobal').value = pct(globalYield);
+  renderTable();
+}
+
+$('yMinus').addEventListener('click', () => setGlobalYield(globalYield - 0.5));
+$('yPlus').addEventListener('click', () => setGlobalYield(globalYield + 0.5));
+$('yieldGlobal').addEventListener('change', e => setGlobalYield(parseBR(e.target.value)));
+$('yieldGlobal').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); setGlobalYield(parseBR(e.target.value)); } });
+
+document.querySelectorAll('.sort').forEach(b => b.addEventListener('click', () => {
+  const k = b.dataset.k;
+  sortState = sortState.k === k ? { k, dir: -sortState.dir } : { k, dir: (k === 't' || k === 'nome') ? 1 : -1 };
+  renderTable();
+}));
+
+$('reportBody').addEventListener('click', e => {
+  const b = e.target.closest('.tk-btn');
+  if (b) lookupTicker(b.dataset.t, { scroll: true });
+});
+
+// ---------- Rendimentos e cotas (B3) ----------
+const dataCurta = iso => new Date(iso).toLocaleDateString('pt-BR');
+
+async function loadB3() {
+  try {
+    const r = await fetch(DADOS_URL, { cache: 'no-cache' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j || !j.fundos) return;
+    b3 = j;
+  } catch { return; }
+  for (const f of FIIS) {
+    const d = b3.fundos[f.t];
+    if (!d) continue;
+    if (d.cotas > 0) f.cotas = d.cotas;
+    if (d.rend12 > 0) { f.rend12 = d.rend12; f.ult = d.ultimo; f.nRend = d.pagamentos; }
+    f.b3 = true;
+  }
+  renderTable();
+  renderSource();
+}
+
+// ---------- Cotações (brapi.dev) ----------
+function readCache() {
+  try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') || {}; } catch { return {}; }
+}
+function writeCache(t, data) {
+  try { const c = readCache(); c[t] = data; localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch {}
+}
+
+// O plano gratuito aceita uma requisição por vez: as chamadas entram numa fila
+let queue = Promise.resolve();
+function brapi(ticker) {
+  const run = () => fetch(`https://brapi.dev/api/quote/${ticker}?token=${encodeURIComponent(BRAPI_TOKEN)}`)
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)));
+  const p = queue.then(run, run);
+  queue = p.catch(() => {});
+  return p;
+}
+
+async function fetchPrice(t) {
+  const c = readCache()[t];
+  if (c && Date.now() - c.ts < CACHE_MS) return c;
+  const json = await brapi(t);
+  const q = json && json.results && json.results[0];
+  if (!q || !(q.regularMarketPrice > 0)) throw new Error('sem cotação');
+  const data = { ts: Date.now(), preco: q.regularMarketPrice, nome: q.longName || q.shortName || '' };
+  writeCache(t, data);
+  return data;
+}
+
+function setLive(f, d) {
+  f.preco = d.preco;
+  f.live = true;
+  f.ts = d.ts;
+  liveAt = Math.max(liveAt || 0, d.ts);
+}
+
+function setStamp(state) {
+  $('stamp').className = 'stamp' + (state === 'live' ? ' live' : state === 'loading' ? ' loading' : '');
+  $('stampText').innerHTML = {
+    live: `Cotações de hoje · <b>${liveAt ? hora(liveAt) : ''}</b> · atraso até 30 min`,
+    loading: 'Atualizando cotações…',
+    error: `Cotações de <b>${BASE_DATE}</b> · não foi possível atualizar`,
+  }[state] || `Cotações de <b>${BASE_DATE}</b>`;
+  renderSource();
+}
+
+function renderSource() {
+  const partes = [
+    liveAt ? `cotações da brapi.dev, atualizadas hoje às ${hora(liveAt)} (atraso de até 30 minutos)` : `cotações consultadas no Investidor10 em ${BASE_DATE}`,
+    b3 ? `rendimentos e cotas emitidas da B3, atualizados em ${dataCurta(b3.atualizadoEm)}` : `rendimentos e cotas emitidas consultados no Investidor10 em ${BASE_DATE}`,
+    `valor patrimonial e vacância consultados no Investidor10 em ${BASE_DATE}`,
+  ];
+  $('srcNote').innerHTML = `<b>Fonte:</b> ${partes.join('; ')}.`;
+}
+
+async function refreshTable() {
+  if (!BRAPI_TOKEN) return;
+  setStamp('loading');
+  let ok = 0;
+  for (const f of FIIS) {
+    try { setLive(f, await fetchPrice(f.t)); ok++; renderTable(); } catch {}
+  }
+  setStamp(ok ? 'live' : 'error');
+  const base = FIIS.find(f => f.t === calc.ticker);
+  if (base && ok) { applyCalc(base); calculate(true); }
+}
+
+// ---------- Calculadora ----------
+const fields = {
+  preco: { el: $('cPreco'), fmt: brl },
+  lucro: { el: $('cLucro'), fmt: brl },
+  qtd: { el: $('cQtd'), fmt: n => fInt.format(n) },
+  payout: { el: $('cPayout'), fmt: pct },
+  yield: { el: $('cYield'), fmt: pct },
+};
+// ticker carregado, rendimento 12m por cota e campos que o usuário editou à mão
+const calc = { ticker: null, rend12: null, manual: new Set() };
+let lookupSeq = 0;
+
+Object.entries(fields).forEach(([k, f]) => {
+  f.el.addEventListener('input', () => {
+    calc.manual.add(k);
+    if (k === 'preco') setHint('precoHint', 'Preço informado manualmente.', '');
+    // Com o rendimento conhecido, a quantidade de cotas recalcula o lucro projetado
+    if (k === 'qtd' && calc.rend12 > 0 && !calc.manual.has('lucro')) {
+      const q = parseBR(f.el.value);
+      if (q > 0) fields.lucro.el.value = brl(calc.rend12 * q);
+    }
+  });
+  f.el.addEventListener('blur', () => {
+    const n = parseBR(f.el.value);
+    if (isFinite(n) && n > 0) f.el.value = f.fmt(n);
+  });
+});
+
+function setHint(id, text, cls) {
+  const el = $(id);
+  el.textContent = text;
+  el.className = 'hint' + (cls ? ' ' + cls : '');
+}
+
+function applyCalc(s) {
+  calc.rend12 = s.rend12 || null;
+  const set = (k, v) => { if (!calc.manual.has(k)) fields[k].el.value = v; };
+  set('preco', s.preco ? brl(s.preco) : '');
+  set('qtd', s.cotas ? fInt.format(s.cotas) : '');
+  set('lucro', s.rend12 && s.cotas ? brl(s.rend12 * s.cotas) : '');
+  set('payout', '100%');
+  set('yield', pct(globalYield));
+
+  if (!calc.manual.has('preco')) {
+    if (s.live) setHint('precoHint', `Cotação de hoje às ${hora(s.ts)} (atraso de até 30 min). Você pode ajustar o preço.`, 'live');
+    else if (s.preco) setHint('precoHint', `Cotação consultada em ${BASE_DATE}. Pode haver defasagem; ajuste para o preço da sua corretora.`, '');
+    else setHint('precoHint', 'Informe o preço que aparece na sua corretora.', 'warn');
+  }
+
+  const partes = [];
+  if (s.rend12) partes.push(`rendimento de 12 meses: ${brl(s.rend12)} por cota${s.nRend ? ` (${s.nRend} pagamentos)` : ''}`);
+  partes.push(s.b3 && b3 ? `rendimentos e cotas da B3 de ${dataCurta(b3.atualizadoEm)}` : `rendimentos e cotas de ${BASE_DATE}`);
+  if (!s.rend12) partes.push('sem rendimentos nos últimos 12 meses: informe o lucro projetado');
+  if (!s.cotas) partes.push('informe a quantidade de cotas');
+  const txt = partes.join('; ');
+  setHint('tickerHint', `${s.nome ? s.nome + ' · ' : ''}${txt.charAt(0).toUpperCase() + txt.slice(1)}.`, s.rend12 && s.cotas ? (s.live ? 'live' : '') : 'warn');
+}
+
+function clearCalc() {
+  calc.rend12 = null;
+  ['preco', 'qtd', 'lucro'].forEach(k => { fields[k].el.value = ''; });
+  fields.payout.el.value = '100%';
+  fields.yield.el.value = pct(globalYield);
+  setHint('precoHint', 'Informe o preço da sua corretora.', '');
+  resetResults();
+}
+
+async function lookupTicker(raw, opts = {}) {
+  const t = String(raw).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!/^[A-Z]{4}\d{1,2}$/.test(t)) {
+    if (t) setHint('tickerHint', 'Digite um ticker completo, por exemplo XPML11.', 'warn');
+    return;
+  }
+  const seq = ++lookupSeq;
+  const base = FIIS.find(f => f.t === t);
+  calc.ticker = t;
+  calc.manual.clear();
+  $('cTicker').value = t;
+  $('cErr').textContent = '';
+  setExplore(t);
+
+  if (opts.scroll) {
+    const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    $('calculadora').scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+  }
+
+  // Fundos do relatório já têm tudo; os demais vêm do arquivo diário da B3
+  const d3 = b3 && b3.fundos[t];
+  let s = base || (d3 ? { t, nome: d3.nome, preco: null, rend12: d3.rend12, cotas: d3.cotas, nRend: d3.pagamentos, b3: true } : null);
+  if (s) { applyCalc(s); calculate(true); } else clearCalc();
+
+  if (!BRAPI_TOKEN || (base && base.live)) {
+    if (!s) setHint('tickerHint', `Não encontrei ${t} entre os fundos imobiliários. Confira o ticker ou preencha os campos manualmente.`, 'warn');
+    return;
+  }
+
+  setHint('precoHint', `Buscando a cotação de ${t}…`, 'loading');
+  try {
+    const d = await fetchPrice(t);
+    if (seq !== lookupSeq) return;
+    if (base) { setLive(base, d); renderTable(); }
+    else s = { ...(s || { t, rend12: null, cotas: null }), nome: (s && s.nome) || d.nome, preco: d.preco, live: true, ts: d.ts };
+    applyCalc(s);
+    calculate(true);
+  } catch {
+    if (seq !== lookupSeq) return;
+    if (!calc.manual.has('preco')) {
+      setHint('precoHint', base
+        ? `Não foi possível buscar a cotação agora; usando a de ${BASE_DATE}.`
+        : 'Não foi possível buscar a cotação agora; informe o preço da sua corretora.', 'warn');
+    }
+    if (!s) setHint('tickerHint', `Não encontrei ${t}. Confira o ticker ou preencha os campos manualmente.`, 'warn');
+  }
+}
+
+let tickTimer;
+$('cTicker').addEventListener('input', e => {
+  clearTimeout(tickTimer);
+  const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  // Busca sozinho quando o ticker parece completo (final 3, 4, 5, 6 ou 11)
+  if (/^[A-Z]{4}(3|4|5|6|11)$/.test(v)) tickTimer = setTimeout(() => lookupTicker(v), 600);
+});
+$('cTicker').addEventListener('change', e => {
+  const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (v !== calc.ticker) { clearTimeout(tickTimer); lookupTicker(v); }
+});
+$('cTicker').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); clearTimeout(tickTimer); lookupTicker(e.target.value); }
+});
+
+const LABELS = { preco: 'preço atual', lucro: 'lucro projetado', qtd: 'quantidade de cotas', payout: 'payout', yield: 'yield aceitável' };
+
+function resetResults() {
+  ['rTeto', 'rLpa', 'rDpa', 'rMargem'].forEach(id => { $(id).textContent = '–'; });
+  $('rMargem').className = 'v';
+  $('gMark').style.left = '50%';
+  $('vMsg').className = 'verdict';
+  $('vMsg').textContent = 'Preencha os campos para ver o resultado';
+  $('sensBody').innerHTML = '';
+  $('sensLede').textContent = 'Quanto mais retorno você exige, mais baixo fica o preço máximo a pagar.';
+}
+
+// silent: chamada automática; com campos faltando, limpa o resultado sem mostrar erro
+function calculate(silent) {
+  const v = {};
+  const bad = [];
+  for (const [k, f] of Object.entries(fields)) {
+    v[k] = parseBR(f.el.value);
+    const ok = isFinite(v[k]) && v[k] > 0;
+    f.el.setAttribute('aria-invalid', ok || silent ? 'false' : 'true');
+    if (!ok) bad.push(LABELS[k]);
+  }
+  if (bad.length) {
+    if (silent) { resetResults(); return; }
+    $('cErr').textContent = `Preencha ${bad.join(', ')} com um valor maior que zero.`;
+    return;
+  }
+  $('cErr').textContent = '';
+
+  const lpa = v.lucro / v.qtd;
+  const dpa = lpa * v.payout / 100;
+  const teto = dpa / (v.yield / 100);
+  const margem = teto / v.preco - 1;
+  const diff = teto - v.preco;
+
+  $('rTeto').textContent = brl(teto);
+  $('rLpa').textContent = brl(lpa);
+  $('rDpa').textContent = brl(dpa);
+  $('rMargem').textContent = pctM(margem);
+  $('rMargem').className = 'v ' + (margem >= 0 ? 'pos' : 'neg');
+
+  // -30% a +30% ocupa a barra inteira
+  const pos = Math.min(100, Math.max(0, 50 + margem / 0.30 * 50));
+  $('gMark').style.left = pos + '%';
+  const vm = $('vMsg');
+  if (margem >= 0) {
+    vm.className = 'verdict yes';
+    vm.textContent = `Comprar: preço atual está ${brl(diff)} abaixo do teto`;
+  } else {
+    vm.className = 'verdict no';
+    vm.textContent = `Aguardar: preço atual está ${brl(-diff)} acima do teto`;
+  }
+
+  const yieldNow = dpa / v.preco * 100;
+  $('sensLede').textContent = `Pagando ${brl(v.preco)}, você recebe ${fDec.format(yieldNow)}% ao ano. Quanto mais retorno você exige, mais baixo fica o preço máximo a pagar.`;
+  const steps = [8, 9, 10, 11, 12];
+  if (!steps.includes(v.yield)) steps.push(v.yield);
+  steps.sort((a, b) => a - b);
+  $('sensBody').innerHTML = steps.map(y => {
+    const t = dpa / (y / 100);
+    const m = t / v.preco - 1;
+    const sim = m >= 0;
+    return `<tr class="${y === v.yield ? 'cur' : ''}">
+      <td>${pct(y)}${y === v.yield ? ' (o seu)' : ''}</td>
+      <td>${brl(t)}</td>
+      <td class="${sim ? 'pos' : 'neg'}">${pctM(m)}</td>
+      <td><span class="pill ${sim ? 'yes' : 'no'}">${sim ? 'SIM' : 'NÃO'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+$('calcForm').addEventListener('submit', e => { e.preventDefault(); calculate(); });
+
+// ---------- Funds Explorer ----------
+function setExplore(t) {
+  const clean = String(t).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  $('exTicker').value = clean;
+  $('exGo').href = clean ? `https://www.fundsexplorer.com.br/funds/${clean.toLowerCase()}` : 'https://www.fundsexplorer.com.br/';
+  $('exGo').textContent = clean ? `Consultar ${clean} no Funds Explorer ↗` : 'Abrir o Funds Explorer ↗';
+}
+$('exTicker').addEventListener('input', e => {
+  const pos = e.target.selectionStart;
+  setExplore(e.target.value);
+  try { e.target.setSelectionRange(pos, pos); } catch {}
+});
+
+renderTable();
+renderSource();
+lookupTicker('XPML11');
+loadB3().then(() => lookupTicker(calc.ticker || 'XPML11')).then(refreshTable);
+</script>
+</body>
+</html>
